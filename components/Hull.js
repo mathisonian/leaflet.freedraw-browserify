@@ -50,10 +50,8 @@ Hull.prototype = {
             hullLatLngs    = [];
 
         latLngs.forEach(function forEach(latLng) {
-
             // Resolve each latitude/longitude to its respective container point.
             points.push(this.map.latLngToLayerPoint(latLng));
-
         }.bind(this));
 
         points.forEach(function forEach(point) {
@@ -70,7 +68,7 @@ Hull.prototype = {
         resolvedPoints.push(resolvedPoints[0]);
 
         resolvedPoints.forEach(function forEach(point) {
-            hullLatLngs.push(this.map.layerPointToLatLng(point));
+            hullLatLngs.push(this.map.layerPointToLatLng([point.x, point.y]));
         }.bind(this));
 
         return hullLatLngs;
