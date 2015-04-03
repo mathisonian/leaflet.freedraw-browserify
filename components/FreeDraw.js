@@ -979,10 +979,6 @@ module.exports = function(L) {
             // Remove from the polygons array.
             var index = this.polygons.indexOf(polygon);
 
-            this.fire('destroy', {
-                index: index
-            });
-
             this.polygons.splice(index, 1);
 
             this.destroyEdges(polygon);
@@ -998,6 +994,10 @@ module.exports = function(L) {
                 this.setMode(this.mode ^ L.FreeDraw.MODES.DELETE);
 
             }
+            
+            this.fire('destroy', {
+                index: index
+            });
 
         },
 
