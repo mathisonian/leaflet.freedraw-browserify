@@ -1,0 +1,57 @@
+{
+  "name": "leaflet.freedraw-browserify",
+  "version": "1.2.1",
+  "description": "Zoopla inspired freehand polygon creation using Leaflet.js.",
+  "main": "index.js",
+  "scripts": {
+    "test": "grunt test",
+    "start": "node example/server/default.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Wildhoney/Leaflet.FreeDraw.git"
+  },
+  "keywords": [
+    "leaflet",
+    "freedraw",
+    "polygon",
+    "drawing",
+    "freehand"
+  ],
+  "author": {
+    "name": "Adam Timberlake",
+    "email": "adam.timberlake@gmail.com"
+  },
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/Wildhoney/Leaflet.FreeDraw/issues"
+  },
+  "homepage": "https://github.com/Wildhoney/Leaflet.FreeDraw",
+  "dependencies": {
+    "d3": "^3.4.13",
+    "graham_scan": "git://github.com/mathisonian/graham_scan_js",
+    "js-clipper": "^1.0.1"
+  },
+  "gitHead": "c06b7ec5136dc5b125e0a8446975b492db48589b",
+  "_id": "leaflet.freedraw-browserify@1.2.1",
+  "_shasum": "896ac6ed087f58caee6579eac91d2570622bf2e6",
+  "_from": "leaflet.freedraw-browserify@~1.2.1",
+  "_npmVersion": "1.4.28",
+  "_npmUser": {
+    "name": "mathisonian",
+    "email": "mc@mathisonian.com"
+  },
+  "maintainers": [
+    {
+      "name": "mathisonian",
+      "email": "mc@mathisonian.com"
+    }
+  ],
+  "dist": {
+    "shasum": "896ac6ed087f58caee6579eac91d2570622bf2e6",
+    "tarball": "http://registry.npmjs.org/leaflet.freedraw-browserify/-/leaflet.freedraw-browserify-1.2.1.tgz"
+  },
+  "directories": {},
+  "_resolved": "https://registry.npmjs.org/leaflet.freedraw-browserify/-/leaflet.freedraw-browserify-1.2.1.tgz",
+  "readme": "ERROR: No README data found!"
+}
