@@ -26,10 +26,22 @@ Options.prototype = {
     multiplePolygons: true,
 
     /**
+     * @property events
+     * @type {Array}
+     */
+    events: [],
+
+    /**
      * @property simplifyPolygon
      * @type {Boolean}
      */
     simplifyPolygon: true,
+
+    /**
+     * @property invalidLength
+     * @type {Boolean}
+     */
+    invalidLength: 3,
 
     /**
      * @property hullAlgorithm
@@ -47,19 +59,13 @@ Options.prototype = {
      * @property createExitMode
      * @type {Boolean}
      */
-    createExitMode: false,
+    createExitMode: true,
 
     /**
      * @property attemptMerge
      * @type {Boolean}
      */
     attemptMerge: true,
-
-    /**
-     * @property svgClassName
-     * @type {String}
-     */
-    svgClassName: 'tracer',
 
     /**
      * @property smoothFactor
@@ -72,6 +78,18 @@ Options.prototype = {
      * @type {String}
      */
     iconClassName: 'polygon-elbow',
+
+    /**
+     * @property svgClassName
+     * @type {String}
+     */
+    svgClassName: 'tracer',
+
+    /**
+     * @property polygonClassName
+     * @type {String}
+     */
+    polygonClassName: 'tracer',
 
     /**
      * @property deleteExitMode
@@ -140,6 +158,15 @@ Options.prototype = {
     },
 
     /**
+     * @method setEvents
+     * @param {Array} eventMap
+     * @return {void}
+     */
+    setEvents: function setEvents(eventMap) {
+        this.events = eventMap;
+    },
+
+    /**
      * @method setMemoriseEachEdge
      * @param value {Boolean}
      * @return {void}
@@ -165,6 +192,7 @@ Options.prototype = {
 
         // Prevent polygons outside of the viewport from being clipped.
         this.L.Path.CLIP_PADDING = value;
+
     },
 
     /**
@@ -257,6 +285,15 @@ Options.prototype = {
     },
 
     /**
+     * @method setPolygonClassName
+     * @param className {String}
+     * @return {void}
+     */
+    setPolygonClassName: function setPolygonClassName(className) {
+        this.polygonClassName = className;
+    },
+
+    /**
      * @method setHullAlgorithm
      * @param algorithm {String|Boolean}
      * @return {void}
@@ -264,19 +301,26 @@ Options.prototype = {
     setHullAlgorithm: function setHullAlgorithm(algorithm) {
 
         if (algorithm && !this.hullAlgorithms.hasOwnProperty(algorithm)) {
+
             // Ensure the passed algorithm is valid.
+            return;
+
+        }
+
+        if (!algorithm) {
+            this.hullAlgorithm = false;
             return;
         }
 
         // Resolve the hull algorithm.
         algorithm = this.hullAlgorithms[algorithm];
 
-        // if (typeof window[algorithm.global] === 'undefined') {
+        if (typeof $window[algorithm.global] === 'undefined') {
 
-        //     // Ensure hull algorithm module has been included.
-        //     this.L.FreeDraw.Throw(algorithm.name + ' is a required library for concave/convex hulls', algorithm.link);
+            // Ensure hull algorithm module has been included.
+            Throw(algorithm.name + ' is a required library for concave/convex hulls', algorithm.link);
 
-        // }
+        }
 
         this.hullAlgorithm = algorithm.method;
 
