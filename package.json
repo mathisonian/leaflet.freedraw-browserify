@@ -29,7 +29,7 @@
   "homepage": "https://github.com/Wildhoney/Leaflet.FreeDraw",
   "dependencies": {
     "d3": "^3.4.13",
-    "graham_scan": "git://github.com/mathisonian/graham_scan_js",
+    "graham_scan": "mathisonian/graham_scan_js",
     "js-clipper": "^1.0.1"
   },
   "gitHead": "c06b7ec5136dc5b125e0a8446975b492db48589b",
