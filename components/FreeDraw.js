@@ -6,6 +6,7 @@ var Hull = require('./Hull');
 var Options = require('./Options');
 var Memory = require('./Memory');
 var Utilities = require('./Utilities');
+var $window = window;
 
 
 module.exports = function(L) {
@@ -33,6 +34,12 @@ module.exports = function(L) {
          * @type {Array}
          */
         state: [],
+
+        /**
+         * @property defaultPreferences
+         * @type {Object}
+         */
+        defaultPreferences: {},
 
         /**
          * @property svg
@@ -187,21 +194,17 @@ module.exports = function(L) {
             }
 
             // Reset all of the properties.
-            this.fromPoint = {
-                x: 0,
-                y: 0
-            };
-            this.polygons = [];
-            this.edges = [];
-            this.hull = {};
-            this.latLngs = [];
+            this.fromPoint = { x: 0, y: 0 };
+            this.polygons  = [];
+            this.edges     = [];
+            this.hull      = {};
+            this._latLngs   = [];
 
             options = options || {};
 
-            this.memory = new Memory(L);
+            this.memory  = new Memory(L);
             this.options = new Options(L);
-            this.hull = new Hull(L);
-            this.utilities = this.Utilities = Utilities;
+            this.hull    = new Hull(L);
             this.element = options.element || null;
 
             this.setMode(options.mode || this.mode);
@@ -209,7 +212,7 @@ module.exports = function(L) {
 
             L.FreeDraw.Polygon = L.Polygon.extend({
                 options: {
-                    className:"leaflet-freedraw-polygon"
+                    className: "leaflet-freedraw-polygon"
                 }
             });
 
@@ -305,6 +308,14 @@ module.exports = function(L) {
             this.map = map;
             this.mode = this.mode || L.FreeDraw.MODES.VIEW;
 
+            // Memorise the preferences so we know how to revert.
+            this.defaultPreferences = {
+                dragging:        map.dragging._enabled,
+                touchZoom:       map.touchZoom._enabled,
+                doubleClickZoom: map.doubleClickZoom._enabled,
+                scrollWheelZoom: map.scrollWheelZoom._enabled
+            };
+
             if (!this.element) {
 
                 // Define the element D3 will bind to if the user hasn't specified a custom node.
@@ -326,12 +337,12 @@ module.exports = function(L) {
             this.createD3();
 
             // Attach all of the events.
-            this._attachMouseDown();
-            this._attachMouseMove();
-            this._attachMouseUpLeave();
+            this.map.on(this.options.events[0] || 'mousedown touchstart', this.bindEvents().mouseDown);
+            this.map.on(this.options.events[1] || 'mousemove touchmove', this.bindEvents().mouseMove);
+            this.map.on(this.options.events[2] || 'mouseup   touchend', this.bindEvents().mouseUpLeave);
 
-            console.log('ON ADD');
-            console.log(this.mode);
+            var element = $window.document.getElementsByTagName('body')[0];
+            element.addEventListener('mouseleave', this.bindEvents().mouseUpLeave);
 
             // Set the default mode.
             this.setMode(this.mode);
@@ -343,7 +354,16 @@ module.exports = function(L) {
          * @return {void}
          */
         onRemove: function onRemove() {
+
             this._clearPolygons();
+
+            this.map.off(this.options.events[0] || 'mousedown touchstart', this.bindEvents().mouseDown);
+            this.map.off(this.options.events[1] || 'mousemove touchmove', this.bindEvents().mouseMove);
+            this.map.off(this.options.events[2] || 'mousedown touchstart', this.bindEvents().mouseUpLeave);
+
+            var element = $window.document.getElementsByTagName('body')[0];
+            element.removeEventListener('mouseleave', this.bindEvents().mouseUpLeave);
+
         },
 
         /**
@@ -354,9 +374,19 @@ module.exports = function(L) {
          * @return {void}
          */
         silently: function silently(callbackFn) {
-            this.silenced = true;
+
+            var silentBefore = this.silenced;
+            this.silenced      = true;
             callbackFn.apply(this);
-            this.silenced = false;
+
+            if (!silentBefore) {
+
+                // Only remove the silence if it wasn't silent before, which prevents against
+                // nesting the `silently` methods inside one another.
+                this.silenced = false;
+
+            }
+
         },
 
         /**
@@ -387,6 +417,28 @@ module.exports = function(L) {
             this.map.doubleClickZoom[method]();
             this.map.scrollWheelZoom[method]();
 
+            if (method === 'enable') {
+
+                // Inherit the preferences assigned to the map instance by the developer.
+
+                if (!this.defaultPreferences.dragging) {
+                    this.map.dragging.disable();
+                }
+
+                if (!this.defaultPreferences.touchZoom) {
+                    this.map.touchZoom.disable();
+                }
+
+                if (!this.defaultPreferences.doubleClickZoom) {
+                    this.map.doubleClickZoom.disable();
+                }
+
+                if (!this.defaultPreferences.scrollWheelZoom) {
+                    this.map.scrollWheelZoom.disable();
+                }
+
+            }
+
         },
 
         /**
@@ -395,9 +447,6 @@ module.exports = function(L) {
          * @return {void}
          */
         setMode: function setMode(mode) {
-
-            console.log('setting mode');
-            console.log(mode)
 
             // Prevent the mode from ever being defined as zero.
             mode = (mode === 0) ? L.FreeDraw.MODES.VIEW : mode;
@@ -724,9 +773,6 @@ module.exports = function(L) {
 
                 latLngs = function simplifyPolygons() {
 
-                    console.log(ClipperLib);
-                    console.log(this.latLngsToClipperPoints);
-
                     var points   = ClipperLib.Clipper.CleanPolygon(this.latLngsToClipperPoints(latLngs), 1.1),
                         polygons = ClipperLib.Clipper.SimplifyPolygon(points, ClipperLib.PolyFillType.pftNonZero);
 
@@ -736,7 +782,7 @@ module.exports = function(L) {
 
             }
 
-            if (latLngs.length <= 3) {
+            if (latLngs.length <= this.options.invalidLength) {
 
                 if (!forceCreation) {
                     return false;
@@ -744,8 +790,10 @@ module.exports = function(L) {
 
             }
 
-            var polygon = new L.FreeDraw.Polygon(latLngs, {
-                smoothFactor: this.options.smoothFactor
+            var className = this.options.polygonClassName,
+                polygon   = new L.FreeDraw.Polygon(latLngs, {
+                smoothFactor: this.options.smoothFactor,
+                className: Array.isArray(className) ? className[this.polygons.length] : className
             });
 
             // Handle the click event on a polygon.
@@ -978,7 +1026,6 @@ module.exports = function(L) {
 
             // Remove from the polygons array.
             var index = this.polygons.indexOf(polygon);
-
             this.polygons.splice(index, 1);
 
             this.destroyEdges(polygon);
@@ -994,10 +1041,6 @@ module.exports = function(L) {
                 this.setMode(this.mode ^ L.FreeDraw.MODES.DELETE);
 
             }
-            
-            this.fire('destroy', {
-                index: index
-            });
 
         },
 
@@ -1086,7 +1129,7 @@ module.exports = function(L) {
                         var latDiffers = latLngGroup[0].lat !== latLngGroup[lastIndex].lat,
                             lngDiffers = latLngGroup[0].lng !== latLngGroup[lastIndex].lng;
 
-                        if (latDiffers && lngDiffers) {
+                        if (latDiffers || lngDiffers) {
 
                             // It's not currently a closed polygon for the query, so we'll create the closed
                             // polygon for the geospatial query.
@@ -1206,7 +1249,8 @@ module.exports = function(L) {
 
             }.bind(this);
 
-            var parts = this.uniqueLatLngs(originalLatLngs(polygon)),
+            var parts     = this.uniqueLatLngs(originalLatLngs(polygon)),
+                indexOf   = this.polygons.indexOf(polygon),
                 edgeCount = 0;
 
             if (!parts) {
@@ -1217,8 +1261,9 @@ module.exports = function(L) {
 
                 // Leaflet creates elbows in the polygon, which we need to utilise to add the
                 // points for modifying its shape.
-                var edge = L.divIcon({
-                        className: this.options.iconClassName
+                var edge = new L.DivIcon({
+                        className: Array.isArray(this.options.iconClassName) ? this.options.iconClassName[indexOf]
+                                                                             : this.options.iconClassName
                     }),
                     latLng = this.map.layerPointToLatLng(point);
 
@@ -1288,79 +1333,132 @@ module.exports = function(L) {
         },
 
         /**
-         * @method _attachMouseDown
-         * @return {void}
-         * @private
+         * @method bindEvents
+         * @return {Object}
          */
-        _attachMouseDown: function _attachMouseDown() {
+        bindEvents: function bindEvents() {
 
-            this.map.on('mousedown touchstart', function onMouseDown(event) {
+            if (this.events) {
+                return this.events;
+            }
+
+            this.events = {
 
                 /**
-                 * Used for determining if the user clicked with the right mouse button.
-                 *
-                 * @constant RIGHT_CLICK
-                 * @type {Number}
+                 * @method mouseDown
+                 * @param {Object} event
+                 * @return {void}
                  */
-                var RIGHT_CLICK = 2;
+                mouseDown: function onMouseDown(event) {
 
-                if (event.originalEvent.button === RIGHT_CLICK) {
-                    return;
-                }
+                    if (this.creating) {
+                        return;
+                    }
 
-                var originalEvent = event.originalEvent;
+                    /**
+                     * Used for determining if the user clicked with the right mouse button.
+                     *
+                     * @constant RIGHT_CLICK
+                     * @type {Number}
+                     */
+                    var RIGHT_CLICK = 2;
 
-                if (!this.options.disablePropagation) {
-                    originalEvent.stopPropagation();
-                }
+                    if (event.originalEvent.button === RIGHT_CLICK) {
+                        return;
+                    }
 
-                originalEvent.preventDefault();
+                    var originalEvent = event.originalEvent;
 
-                this.latLngs = [];
-                this.fromPoint = this.map.latLngToContainerPoint(event.latlng);
+                    if (!this.options.disablePropagation) {
+                        originalEvent.stopPropagation();
+                    }
 
-                if (this.mode & L.FreeDraw.MODES.CREATE) {
+                    originalEvent.preventDefault();
 
-                    // Place the user in create polygon mode.
-                    this.creating = true;
-                    this.setMapPermissions('disable');
+                    this.latLngs   = [];
+                    this.fromPoint = this.map.latLngToContainerPoint(event.latlng);
 
-                }
+                    if (this.mode & L.FreeDraw.MODES.CREATE) {
 
-            }.bind(this));
+                        // Place the user in create polygon mode.
+                        this.creating = true;
+                        this.setMapPermissions('disable');
 
-        },
+                    }
 
-        /**
-         * @method _attachMouseMove
-         * @return {void}
-         * @private
-         */
-        _attachMouseMove: function _attachMouseMove() {
+                }.bind(this),
 
-            this.map.on('mousemove touchmove', function onMouseMove(event) {
+                /**
+                 * @method mouseMove
+                 * @param {Object} event
+                 * @return {void}
+                 */
+                mouseMove: function onMouseMove(event) {
 
-                var originalEvent = event.originalEvent;
+                    var originalEvent = event.originalEvent;
 
-                if (this.movingEdge) {
+                    if (this.movingEdge) {
 
-                    // User is in fact modifying the shape of the polygon.
-                    this._editMouseMove(event);
-                    return;
+                        // User is in fact modifying the shape of the polygon.
+                        this._editMouseMove(event);
+                        return;
 
-                }
+                    }
 
-                if (!this.creating) {
+                    if (!this.creating) {
 
-                    // We can't do anything else if the user is not in the process of creating a brand-new
-                    // polygon.
-                    return;
+                        // We can't do anything else if the user is not in the process of creating a brand-new
+                        // polygon.
+                        return;
 
-                }
+                    }
 
-                this._createMouseMove(originalEvent);
+                    this._createMouseMove(originalEvent);
 
-            }.bind(this));
+                }.bind(this),
+
+                /**
+                 * @method mouseUpLeave
+                 * @return {void}
+                 */
+                mouseUpLeave: function mouseUpLeave() {
+
+                    if (this.movingEdge) {
+
+                        if (!this.options.boundariesAfterEdit) {
+
+                            // Notify of a boundary update immediately after editing one edge.
+                            this.notifyBoundaries();
+
+                        } else {
+
+                            // Change the option so that the boundaries will be invoked once the edit mode
+                            // has been exited.
+                            this.boundaryUpdateRequired = true;
+
+                        }
+
+                        // Recreate the polygon boundaries because we may have straight edges now.
+                        this.trimPolygonEdges(this.movingEdge._freedraw.polygon);
+                        this.mergePolygons();
+                        this.movingEdge = null;
+
+                        if (this.options.memoriseEachEdge) {
+                            this.memory.save(this.getPolygons(true));
+                        }
+
+                        setTimeout(this.emitPolygonCount.bind(this), this.RECOUNT_TIMEOUT);
+                        return;
+
+                    }
+
+                    this._createMouseUp();
+
+                }.bind(this)
+
+            };
+
+            return this.events;
 
         },
 
@@ -1380,59 +1478,6 @@ module.exports = function(L) {
 
             // Update the polygon's shape in real-time as the user drags their cursor.
             this.updatePolygonEdge(this.movingEdge, pointModel.x, pointModel.y);
-
-        },
-
-        /**
-         * @method _attachMouseUpLeave
-         * @return {void}
-         * @private
-         */
-        _attachMouseUpLeave: function _attachMouseUpLeave() {
-
-            /**
-             * @method completeAction
-             * @return {void}
-             */
-            var completeAction = function completeAction() {
-
-                if (this.movingEdge) {
-
-                    if (!this.options.boundariesAfterEdit) {
-
-                        // Notify of a boundary update immediately after editing one edge.
-                        this.notifyBoundaries();
-
-                    } else {
-
-                        // Change the option so that the boundaries will be invoked once the edit mode
-                        // has been exited.
-                        this.boundaryUpdateRequired = true;
-
-                    }
-
-                    // Recreate the polygon boundaries because we may have straight edges now.
-                    this.trimPolygonEdges(this.movingEdge._freedraw.polygon);
-                    this.mergePolygons();
-                    this.movingEdge = null;
-
-                    if (this.options.memoriseEachEdge) {
-                        this.memory.save(this.getPolygons(true));
-                    }
-
-                    setTimeout(this.emitPolygonCount.bind(this), this.RECOUNT_TIMEOUT);
-                    return;
-
-                }
-
-                this._createMouseUp();
-
-            }.bind(this);
-
-            this.map.on('mouseup touchend', completeAction);
-
-            var element = document.getElementsByTagName('body')[0];
-            element.onmouseleave = completeAction;
 
         },
 
@@ -1470,17 +1515,15 @@ module.exports = function(L) {
         _createMouseMove: function _createMouseMove(event) {
 
             // Resolve the pixel point to the latitudinal and longitudinal equivalent.
-            var point = this.map.mouseEventToContainerPoint(event),
+            var point  = this.map.mouseEventToContainerPoint(event),
                 latLng = this.map.containerPointToLatLng(point);
 
             // Line data that is fed into the D3 line function we defined earlier.
-            var lineData = [this.fromPoint, {
-                x: point.x,
-                y: point.y
-            }];
+            var lineData = [this.fromPoint, new L.Point(point.x, point.y)];
 
             // Draw SVG line based on the last movement of the mouse's position.
-            this.svg.append('path').attr('d', this.lineFunction(lineData)).attr('class', 'mouse-line');
+            this.svg.append('path').classed('drawing-line', true).attr('d', this.lineFunction(lineData))
+                    .attr('stroke', '#D7217E').attr('stroke-width', 2).attr('fill', 'none');
 
             // Take the pointer's position from the event for the next invocation of the mouse move event,
             // and store the resolved latitudinal and longitudinal values.
@@ -1503,7 +1546,6 @@ module.exports = function(L) {
 
             // User has finished creating their polygon!
             this.creating = false;
-            this.setMapPermissions('enable');
 
             if (this.latLngs.length <= 2) {
 
@@ -1527,6 +1569,7 @@ module.exports = function(L) {
             var polygon = this.createPolygon(latLngs || this.latLngs);
 
             if (!polygon) {
+                this.setMapPermissions('enable');
                 return;
             }
 
@@ -1536,10 +1579,11 @@ module.exports = function(L) {
 
                 // Automatically exit the user from the creation mode.
                 this.setMode(this.mode ^ L.FreeDraw.MODES.CREATE);
+                this.setMapPermissions('enable');
 
             }
 
-        },
+        }
 
     });
 
@@ -1548,6 +1592,7 @@ module.exports = function(L) {
      * @type {Object}
      */
     L.FreeDraw.MODES = {
+        NONE: 0,
         VIEW: 1,
         CREATE: 2,
         EDIT: 4,
@@ -1570,12 +1615,12 @@ module.exports = function(L) {
             if (path.substr(0, 7) === 'http://' || path.substr(0, 8) === 'https://') {
 
                 // Use developer supplied full URL since we've received a FQDN.
-                console.error(path);
+                $window.console.error(path);
 
             } else {
 
                 // Output a link for a more informative message in the EXCEPTIONS.md.
-                console.error('See: https://github.com/Wildhoney/Leaflet.FreeDraw/blob/master/EXCEPTIONS.md#' + path);
+                $window.console.error('See: https://github.com/Wildhoney/Leaflet.FreeDraw/blob/master/EXCEPTIONS.md#' + path);
 
             }
         }

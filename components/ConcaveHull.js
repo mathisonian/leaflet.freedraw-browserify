@@ -7,14 +7,16 @@ var $math = Math;
  * @author Adam Timberlake <adam.timberlake@gmail.com>
  * @author Nikolay Redko <redko@inexika.com>
  * @link https://github.com/Wildhoney/ConcaveHull
- * @param latLngs {L.LatLng[]}
+ * @param latLngs {Object}
  * @param maxDistance {Number}
  * @constructor
  */
 var ConcaveHull = function ConcaveHull(latLngs, maxDistance) {
+
     var result       = this.convertLatLngs(latLngs);
     this.points      = result.points;
     this.maxDistance = isFinite(maxDistance) ? maxDistance : (result.maxDistance + 1);
+
 };
 
 /**
@@ -51,7 +53,7 @@ ConcaveHull.prototype = {
 
                 if (latLngs[$index - 1]) {
 
-                    var distance = latLng.distanceTo(latLngs[$index - 1]);
+                    var distance = this.distanceTo(latLng, latLngs[$index - 1]);
 
                     if (distance > longestDistance) {
                         longestDistance = distance;
@@ -68,8 +70,30 @@ ConcaveHull.prototype = {
     },
 
     /**
+     * @method distanceTo
+     * @param firstLatLng {Object}
+     * @param secondLatLng {Object}
+     * @return {Number}
+     */
+    distanceTo: function distanceTo(firstLatLng, secondLatLng) {
+
+        var R    = 6378137,
+            d2r  = $math.PI / 180,
+            dLat = (secondLatLng.lat - firstLatLng.lat) * d2r,
+            dLon = (secondLatLng.lng - firstLatLng.lng) * d2r,
+            lat1 = firstLatLng.lat * d2r,
+            lat2 = secondLatLng.lat * d2r,
+            sin1 = $math.sin(dLat / 2),
+            sin2 = $math.sin(dLon / 2);
+
+        var a = sin1 * sin1 + sin2 * sin2 * $math.cos(lat1) * $math.cos(lat2);
+        return R * 2 * $math.atan2($math.sqrt(a), $math.sqrt(1 - a));
+
+    },
+
+    /**
      * @method getLatLngs
-     * @return {L.LatLng[]}
+     * @return {Object}
      */
     getLatLngs: function getLatLngs() {
 
@@ -106,7 +130,7 @@ ConcaveHull.prototype = {
 
             for (var i = 0, l = byAngle.length; i < l; i++) {
 
-                if (current.distanceTo(byAngle[i]) < this.maxDistance && !this.isIntersecting(hull, byAngle[i])) {
+                if (this.distanceTo(current, byAngle[i]) < this.maxDistance && !this.isIntersecting(hull, byAngle[i])) {
                     next = byAngle[i];
                     break;
                 }
@@ -153,8 +177,8 @@ ConcaveHull.prototype = {
 
     /**
      * @method isIntersecting
-     * @param latLngs {L.LatLng[]}
-     * @param otherLatLngs {L.LatLng[]}
+     * @param latLngs {Object}
+     * @param otherLatLngs {Object}
      * @return {Boolean}
      */
     isIntersecting: function isIntersecting(latLngs, otherLatLngs) {
@@ -173,10 +197,10 @@ ConcaveHull.prototype = {
 
     /**
      * @method intersect
-     * @param p1 {L.LatLng}
-     * @param p2 {L.LatLng}
-     * @param q1 {L.LatLng}
-     * @param q2 {L.LatLng}
+     * @param p1 {Object}
+     * @param p2 {Object}
+     * @param q1 {Object}
+     * @param q2 {Object}
      * @return {Boolean}
      */
     intersect: function intersect(p1, p2, q1, q2) {
@@ -192,7 +216,7 @@ ConcaveHull.prototype = {
 
     /**
      * @method lat2y
-     * @param latLng {L.LatLng}
+     * @param latLng {Object}
      * @return {Number}
      */
     lat2y: function lat2y(latLng) {
@@ -201,9 +225,9 @@ ConcaveHull.prototype = {
 
     /**
      * @method ccw
-     * @param p0 {L.LatLng}
-     * @param p1 {L.LatLng}
-     * @param p2 {L.LatLng}
+     * @param p0 {Object}
+     * @param p1 {Object}
+     * @param p2 {Object}
      * @return {Number}
      */
     ccw: function ccw(p0, p1, p2) {
@@ -237,9 +261,9 @@ ConcaveHull.prototype = {
 
     /**
      * @method getAngle
-     * @param current {L.LatLng}
-     * @param previous {L.LatLng}
-     * @param next {L.LatLng}
+     * @param current {Object}
+     * @param previous {Object}
+     * @param next {Object}
      * @return {Number}
      */
     getAngle: function getAngle(current, previous, next) {

@@ -68,7 +68,7 @@ Hull.prototype = {
         resolvedPoints.push(resolvedPoints[0]);
 
         resolvedPoints.forEach(function forEach(point) {
-            hullLatLngs.push(this.map.layerPointToLatLng([point.x, point.y]));
+            hullLatLngs.push(this.map.layerPointToLatLng(point));
         }.bind(this));
 
         return hullLatLngs;
